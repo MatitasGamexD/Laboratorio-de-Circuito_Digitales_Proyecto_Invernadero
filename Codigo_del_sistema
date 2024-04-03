@@ -1,0 +1,255 @@
+#include "DHT.h" // Incluye libreria para sensor DHT
+#include <Wire.h> // Permite comunicacion con dos lineas
+#include <LiquidCrystal_I2C.h> // Incluye libreria para pantalla LCD
+#include <WiFi.h>
+#include <UniversalTelegramBot.h>
+
+#define DHTPIN 14    // Pin donde está conectado el sensor
+#define DHTTYPE DHT22   // Sensor DHT22
+LiquidCrystal_I2C lcd(0x27,16,2);  //Crea el objeto lcd  dirección  0x3F y 16 columnas x 2 filas
+DHT dht(DHTPIN, DHTTYPE);
+int calefactor=19;  // Declara calefactor en pin 19
+int recirculacion=18;  // Declara bomba centrifuga para recirculacion en pin18
+int ventilador=5;  //  Declara ventilador en pin 5
+int bombillo=4;  //  Declara bombillo en pin 4
+int rociador=2;  //  Declara bomba sumergible para rociador en pin 2
+int sensores=27; //  Declara salida para activar sensores en pin 27
+int encendidogeneral=13;  //  Declara encendido general en pin 13
+int fotoresistor=12; // Declara fotoresistor en pin 12
+int fllenobombac=25;  // Declara flotador de maximo nivel de bomba centrifuga en pin 25
+int fvaciobombac=26;  // Declara flotador de minimo nivel de bomba centrifuga en pin 26 
+int fllenobombasu=32;  // Declara flotador de maximo nivel de bomba sumergible en pin 32
+int fvaciobombasu=33;  // Declara flotador de minimo nivel de bomba sumergible en pin 33
+
+const char* SECRET_SSID = "TP-LINK_DE16";
+const char* SECRET_PASS = "67743667";
+const char* BOT_TOKEN = "tu_token_de_telegram";
+
+WiFiClient client;
+UniversalTelegramBot bot(BOT_TOKEN, client);
+
+void handleNewMessages(int numNewMessages) {
+  for (int i = 0; i < numNewMessages; i++) {
+    String chat_id = String(bot.messages[i].chat_id);
+    String from_id = String(bot.messages[i].from_id);
+    String text = bot.messages[i].text;
+    
+    if (bot.messages[i].text == "/start") {
+      String from_name = bot.messages[i].from_name;
+      bot.sendMessage(chat_id, "¡Bienvenido, " + from_name + "! El invernadero está listo para recibir comandos.");
+    } else {
+      bot.sendMessage(chat_id, "Comando no reconocido.");
+
+    }
+        if (text == "/calefactoron") {
+      digitalWrite(calefactor, LOW);
+      bot.sendMessage(chat_id, "Calefactor is ON", "");
+    }
+
+    if (text == "/calefactoroff") {
+      digitalWrite(calefactor, HIGH);
+      bot.sendMessage(chat_id, "Calefactor is OFF", "");
+    }
+
+    if (text == "/calefactorstatus") {
+      if (digitalRead(calefactor) == LOW) {
+        bot.sendMessage(chat_id, "Calefactor is ON", "");
+      } else {
+        bot.sendMessage(chat_id, "Calefactor is OFF", "");
+      }
+    }
+
+    if (text == "/ventiladoron") {
+      digitalWrite(ventilador, LOW);
+      bot.sendMessage(chat_id, "Ventilador is ON", "");
+    }
+
+    if (text == "/ventiladoroff") {
+      digitalWrite(ventilador, HIGH);
+      bot.sendMessage(chat_id, "Ventilador is OFF", "");
+    }
+
+    if (text == "/ventiladorstatus") {
+      if (digitalRead(ventilador) == LOW) {
+        bot.sendMessage(chat_id, "Ventilador is ON", "");
+      } else {
+        bot.sendMessage(chat_id, "Ventilador is OFF", "");
+      }
+    }
+
+    if (text == "/rociadoron") {
+      digitalWrite(rociador, LOW);
+      bot.sendMessage(chat_id, "Rociador is ON", "");
+    }
+
+    if (text == "/rociadoroff") {
+      digitalWrite(rociador, HIGH);
+      bot.sendMessage(chat_id, "Rociador is OFF", "");
+    }
+
+    if (text == "/rociadorstatus") {
+      if (digitalRead(rociador) == LOW) {
+        bot.sendMessage(chat_id, "Rociador is ON", "");
+      } else {
+        bot.sendMessage(chat_id, "Rociador is OFF", "");
+      }
+    }
+
+    if (text == "/ledon") {
+      digitalWrite(bombillo, HIGH);
+      bot.sendMessage(chat_id, "Led is ON", "");
+    }
+
+    if (text == "/ledoff") {
+      digitalWrite(bombillo, LOW);
+      bot.sendMessage(chat_id, "Led is OFF", "");
+    }
+
+    if (text == "/ledstatus") {
+      if (digitalRead(bombillo) == HIGH) {
+        bot.sendMessage(chat_id, "Led is OFF", "");
+      } else {
+        bot.sendMessage(chat_id, "Led is ON", "");
+      }
+    }
+  }
+}
+  
+
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) {
+    ; // esperar a que se conecte el puerto serial, necesario para algunas placas
+  }
+
+  WiFi.begin(SECRET_SSID, SECRET_PASS);
+
+  pinMode(calefactor,OUTPUT);  // Configurar calefactor como salida
+  pinMode(recirculacion,OUTPUT);  // Configurar bomba centrifuga de recirculacion como salida
+  pinMode(ventilador,OUTPUT);  //  Configurar ventilador como salida
+  pinMode(bombillo,OUTPUT);  // Configurar bombillo como salida
+  pinMode(rociador,OUTPUT);  // Configurar bomba sumergible como rociador como salida
+  pinMode(sensores,OUTPUT);  // Configurar sensores como salida
+  pinMode(encendidogeneral,INPUT);  // Configura encendido general como entrada
+  pinMode(fotoresistor, INPUT);  //Configura Fotoresistor como salida
+  pinMode(fllenobombac,INPUT);  // Configura flotador de maximo nivel bomba centrifuga como entrada
+  pinMode(fvaciobombac,INPUT);  // Configura flotador de minimo nivel bomba centrifuga como entrada
+  pinMode(fllenobombasu,INPUT);  // Configura flotador de maximo nivel bomba sumergible como entrada
+  pinMode(fvaciobombasu,INPUT);  // Configura flotador de minimo nivel bomba sumergible como entrada
+  lcd.init();  // Inicializar el LCD
+  lcd.backlight();  // Encender la luz de fondo.
+  dht.begin();  // Inicializa el sensor dht 
+  lcd.setCursor(0,0);
+  lcd.print("   BIENVENIDO   ");
+  lcd.setCursor(0,1);
+  lcd.print("INICIE   SISTEMA");
+}
+
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Conexión WiFi no establecida. Reintentando...");
+    delay(5000);
+    WiFi.begin(SECRET_SSID, SECRET_PASS);
+  }
+
+  delay(2000); // Lectura de temperatura o humedad toma alrededor de 250 ms
+  int sistemaon=digitalRead(encendidogeneral); //  Lectura de encendido general del sistema 
+  float h = dht.readHumidity(); // Lectura de humedad en porcentaje % 
+  float t = dht.readTemperature(); // Lectura de temperature en grados Celsius
+  int rociadorvacio=digitalRead(fvaciobombasu); // Lectura de nivel bajo bomba sumergible
+  int recirculacionlleno=digitalRead(fllenobombac); // Lectura de nivel alto bomba centrifuga
+  int recirculacionvacio=digitalRead(fvaciobombac); // Lectura de nivel bajo bomba centrifuga
+  int iluminacion=digitalRead(fotoresistor); // Lectura de fotoresistor
+  if(sistemaon==1)
+  {
+  digitalWrite(sensores, HIGH);
+if (t>24) {
+  digitalWrite(calefactor, LOW); 
+  digitalWrite(ventilador, HIGH); 
+            }
+  if (t<18) {
+  digitalWrite(calefactor, HIGH); 
+  digitalWrite(ventilador, LOW); 
+  }
+  if(t>=18 && t<=24){
+                digitalWrite(calefactor, LOW); 
+                digitalWrite(ventilador, LOW); 
+                }
+  if(h<60 && rociadorvacio==0){
+                digitalWrite(rociador, HIGH); 
+          }
+  if(rociadorvacio==1 || h>80){
+                digitalWrite(rociador, LOW); 
+          }       
+  if(t<18 && h>80){
+                digitalWrite(calefactor, HIGH); 
+          } 
+  if(t>24 && h<80){
+                digitalWrite(calefactor, LOW);
+                  }
+  if(h>=60 && h<=80 && recirculacionlleno==0){
+                digitalWrite(recirculacion, HIGH);
+                                              }   
+  if(recirculacionvacio==0 || h<60 || h>80){
+                digitalWrite(recirculacion, LOW);
+                           }     
+  if(iluminacion==0){
+                digitalWrite(bombillo, LOW);
+                    }        
+  if(iluminacion==1){
+                digitalWrite(bombillo, HIGH);
+                    }      
+  lcd.setCursor(0,0);  // Cursor en la primera posición de la primera fila
+  lcd.print("T:");  // Imprime letra T
+  lcd.print(t,1);  // Imprime valor de temperatura de sensor
+  lcd.print("C");  // Imprime unidad de medida en °C  "223" -> "°"
+  lcd.print("   ");  // Deja espacio para siguiente medida
+  if(iluminacion==1){
+  lcd.setCursor(10,0);  // Cursor en la 11° posición de la primera fila
+  lcd.print("NOCHE  ");  // Imprime palabra noche
+  }
+  if(iluminacion==0){
+  lcd.setCursor(10,0);  // Cursor en la 11° posición de la primera fila
+  lcd.print(" DIA  ");  // Imprime palabra dia
+  }
+  lcd.setCursor(0,1);  // Cursor en la primera posición de la segunda fila
+  lcd.print("H:");  // Imprime letra H
+  lcd.print(h,1);  // Imprime valor de humedad de sensor
+  lcd.print("%");  // Imprime unidad de medida en %
+  lcd.print("   ");  // Deja espacio para siguiente medida
+  if(h<60 && rociadorvacio==0){
+  lcd.setCursor(10,1);  // Cursor en la 11° posición de la segunda fila
+  lcd.print("ROCIAD");  // Imprime palabra rociador
+  }
+  if(h>=60 && h<=80 && recirculacionlleno==0){
+  lcd.setCursor(10,1);  // Cursor en la 11° posición de la segunda fila
+  lcd.print("RECIRC");  // Imprime palabra recirculacion
+  }
+  if(recirculacionvacio==0 || h>80 || rociadorvacio==1){
+  lcd.setCursor(10,1);  // Cursor en la 11° posición de la segunda fila
+  lcd.print("      ");  // Borra mensaje
+  }
+  delay(200);                    
+ } if(sistemaon==0){
+    lcd.setCursor(0,0);
+    lcd.print("   BIENVENIDO   ");
+    lcd.setCursor(0,1);
+    lcd.print("INICIE   SISTEMA");
+    digitalWrite(19,LOW); 
+    digitalWrite(18,LOW);
+    digitalWrite(5,LOW);
+    digitalWrite(4,LOW);
+    digitalWrite(2,LOW);
+    digitalWrite(27,LOW);
+    delay(200);  
+ }
+
+  // Manejo de nuevos mensajes de Telegram
+  int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+  while (numNewMessages) {
+    Serial.println("Nuevos mensajes recibidos.");
+    handleNewMessages(numNewMessages);
+    numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+  }
+}
